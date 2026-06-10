@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@theme {
+  --color-pesantren-green: #16a34a;
+  --color-pesantren-darkGreen: #15803d;
+  --color-pesantren-red: #dc2626;
+  --color-pesantren-yellow: #facc15;
+  --color-pesantren-light: #f8fafc;
+  --color-pesantren-dark: #0f172a;
+}
