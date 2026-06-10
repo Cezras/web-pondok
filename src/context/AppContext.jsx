@@ -1,6 +1,10 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
 
 const AppContext = createContext();
+
+// API Base URL - sesuaikan dengan environment
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export const useApp = () => {
   const context = useContext(AppContext);
@@ -12,72 +16,94 @@ export const useApp = () => {
 
 export const AppProvider = ({ children }) => {
   // State untuk musik
-  const [currentMusic, setCurrentMusic] = useState(() => {
-    const saved = localStorage.getItem('pondokMusic');
-    return saved ? JSON.parse(saved) : { name: 'Default Music', url: '/music/default.mp3' };
-  });
+  const [currentMusic, setCurrentMusic] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // State untuk berita
-  const [beritaList, setBeritaList] = useState(() => {
-    const saved = localStorage.getItem('pondokBerita');
-    return saved ? JSON.parse(saved) : [
-      {
-        id: '1',
-        title: 'Wisuda Santri KMI Angkatan ke-7 — Ferventera Generation',
-        category: 'Kegiatan Pesantren',
-        image: '/wisuda.png',
-        excerpt: 'Alhamdulillah, dengan penuh rasa syukur dan haru, kami mengabadikan momen bersejarah Wisuda Santri Kelas Akhir KMI Angkatan ke-7 Ferventera Generation Pondok Modern Al-Hikmah Pemenang.',
-        content: 'Konten lengkap berita wisuda...',
-        date: '2024-01-15',
-        author: 'Admin Pondok'
-      },
-      {
-        id: '2',
-        title: 'Yudisium dan Pengarahan Pengabdian Santri KMI Angkatan ke-7',
-        category: 'Kegiatan Pesantren',
-        image: '/yudisium.png',
-        excerpt: 'Kegiatan ini menjadi penanda berakhirnya masa pendidikan formal para santri, sekaligus awal dari pengabdian nyata di tengah masyarakat.',
-        content: 'Konten lengkap berita yudisium...',
-        date: '2024-01-10',
-        author: 'Admin Pondok'
-      },
-      {
-        id: '3',
-        title: 'Halal Bihalal Keluarga Besar Pondok Modern Al-Hikmah',
-        category: 'Acara & Silaturahmi',
-        image: '/bihalal.png',
-        excerpt: 'Momen penuh makna untuk menautkan kembali hati, menguatkan ukhuwah, serta memperbarui niat dalam kebersamaan di jalan kebaikan.',
-        content: 'Konten lengkap berita halal bihalal...',
-        date: '2024-01-05',
-        author: 'Admin Pondok'
-      },
-      {
-        id: '4',
-        title: 'Penyaluran Donasi Program Ramadhan Berbagi',
-        category: 'Sosial & Kemanusiaan',
-        image: '/donasi.png',
-        excerpt: 'Alhamdulillah, donasi yang terkumpul dalam program ini mencapai Rp 14.649.000 dan telah disalurkan untuk lansia dan dhuafa.',
-        content: 'Konten lengkap berita donasi...',
-        date: '2024-01-01',
-        author: 'Admin Pondok'
-      }
-    ];
-  });
-
+  const [beritaList, setBeritaList] = useState([]);
+  
   // State untuk galeri foto
-  const [galeriList, setGaleriList] = useState(() => {
-    const saved = localStorage.getItem('pondokGaleri');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', title: 'Wisuda 2024', image: '/wisuda.png', date: '2024-01-15' },
-      { id: '2', title: 'Yudisium 2024', image: '/yudisium.png', date: '2024-01-10' },
-      { id: '3', title: 'Halal Bihalal', image: '/bihalal.png', date: '2024-01-05' },
-      { id: '4', title: 'Donasi Ramadhan', image: '/donasi.png', date: '2024-01-01' }
-    ];
-  });
+  const [galeriList, setGaleriList] = useState([]);
 
-  // Simpan ke localStorage saat data berubah
+  // Fetch data dari database saat pertama kali load
   useEffect(() => {
-    localStorage.setItem('pondokMusic', JSON.stringify(currentMusic));
+    const fetchData = async () => {
+      try {
+        // Fetch music terbaru
+        const musicRes = await axios.get(`${API_URL}/music/latest`);
+        if (musicRes.data.success && musicRes.data.data) {
+          setCurrentMusic({
+            name: musicRes.data.data.name,
+            url: `${API_URL}${musicRes.data.data.fileUrl}`
+          });
+        } else {
+          // Fallback ke default jika tidak ada musik
+          setCurrentMusic({ name: 'Default Music', url: '/music/default.mp3' });
+        }
+
+        // Fetch berita
+        const newsRes = await axios.get(`${API_URL}/news`);
+        if (newsRes.data.success) {
+          setBeritaList(newsRes.data.data.map(item => ({
+            id: item._id,
+            title: item.title,
+            category: 'Kegiatan Pesantren',
+            image: item.imageUrl ? `${API_URL}${item.imageUrl}` : '/default-news.png',
+            excerpt: item.content.substring(0, 150) + '...',
+            content: item.content,
+            date: new Date(item.createdAt).toISOString().split('T')[0],
+            author: 'Admin Pondok'
+          })));
+        }
+
+        // Fetch galeri
+        const galleryRes = await axios.get(`${API_URL}/gallery`);
+        if (galleryRes.data.success) {
+          setGaleriList(galleryRes.data.data.map(item => ({
+            id: item._id,
+            title: item.title,
+            image: `${API_URL}${item.imageUrl}`,
+            caption: item.caption,
+            date: new Date(item.createdAt).toISOString().split('T')[0]
+          })));
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        // Fallback ke localStorage jika API gagal
+        loadFromLocalStorage();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Fungsi fallback ke localStorage
+  const loadFromLocalStorage = () => {
+    const savedMusic = localStorage.getItem('pondokMusic');
+    if (savedMusic) {
+      setCurrentMusic(JSON.parse(savedMusic));
+    } else {
+      setCurrentMusic({ name: 'Default Music', url: '/music/default.mp3' });
+    }
+
+    const savedBerita = localStorage.getItem('pondokBerita');
+    if (savedBerita) {
+      setBeritaList(JSON.parse(savedBerita));
+    }
+
+    const savedGaleri = localStorage.getItem('pondokGaleri');
+    if (savedGaleri) {
+      setGaleriList(JSON.parse(savedGaleri));
+    }
+  };
+
+  // Simpan ke localStorage saat data berubah (backup)
+  useEffect(() => {
+    if (currentMusic) {
+      localStorage.setItem('pondokMusic', JSON.stringify(currentMusic));
+    }
   }, [currentMusic]);
 
   useEffect(() => {
@@ -93,52 +119,58 @@ export const AppProvider = ({ children }) => {
     setCurrentMusic(musicData);
   };
 
-  // Fungsi untuk tambah berita
-  const addBerita = (beritaData) => {
-    const newBerita = {
-      ...beritaData,
-      id: Date.now().toString(),
-      date: new Date().toISOString().split('T')[0],
-      author: 'Admin Pondok'
-    };
-    setBeritaList(prev => [newBerita, ...prev]);
-  };
+  // Fungsi untuk refresh data dari server
+  const refreshData = async () => {
+    setLoading(true);
+    try {
+      const musicRes = await axios.get(`${API_URL}/music/latest`);
+      if (musicRes.data.success && musicRes.data.data) {
+        setCurrentMusic({
+          name: musicRes.data.data.name,
+          url: `${API_URL}${musicRes.data.data.fileUrl}`
+        });
+      }
 
-  // Fungsi untuk update berita
-  const updateBerita = (id, beritaData) => {
-    setBeritaList(prev => prev.map(item => item.id === id ? { ...item, ...beritaData } : item));
-  };
+      const newsRes = await axios.get(`${API_URL}/news`);
+      if (newsRes.data.success) {
+        setBeritaList(newsRes.data.data.map(item => ({
+          id: item._id,
+          title: item.title,
+          category: 'Kegiatan Pesantren',
+          image: item.imageUrl ? `${API_URL}${item.imageUrl}` : '/default-news.png',
+          excerpt: item.content.substring(0, 150) + '...',
+          content: item.content,
+          date: new Date(item.createdAt).toISOString().split('T')[0],
+          author: 'Admin Pondok'
+        })));
+      }
 
-  // Fungsi untuk hapus berita
-  const deleteBerita = (id) => {
-    setBeritaList(prev => prev.filter(item => item.id !== id));
-  };
-
-  // Fungsi untuk tambah foto galeri
-  const addGaleri = (galeriData) => {
-    const newGaleri = {
-      ...galeriData,
-      id: Date.now().toString(),
-      date: new Date().toISOString().split('T')[0]
-    };
-    setGaleriList(prev => [newGaleri, ...prev]);
-  };
-
-  // Fungsi untuk hapus foto galeri
-  const deleteGaleri = (id) => {
-    setGaleriList(prev => prev.filter(item => item.id !== id));
+      const galleryRes = await axios.get(`${API_URL}/gallery`);
+      if (galleryRes.data.success) {
+        setGaleriList(galleryRes.data.data.map(item => ({
+          id: item._id,
+          title: item.title,
+          image: `${API_URL}${item.imageUrl}`,
+          caption: item.caption,
+          date: new Date(item.createdAt).toISOString().split('T')[0]
+        })));
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const value = {
     currentMusic,
     updateMusic,
     beritaList,
-    addBerita,
-    updateBerita,
-    deleteBerita,
+    setBeritaList,
     galeriList,
-    addGaleri,
-    deleteGaleri
+    setGaleriList,
+    loading,
+    refreshData
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

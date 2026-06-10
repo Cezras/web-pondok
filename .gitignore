@@ -2,17 +2,6 @@
 # Dependencies
 node_modules/
 
-# Build artifacts
-dist/
-build/
-target/
-
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
 # Environment variables
 .env
 .env.local
@@ -23,21 +12,33 @@ __pycache__/
 .idea/
 *.swp
 *.swo
-*.tmp
 
 # Logs
 *.log
 
-# Coverage
+# Temporary files
+*.tmp
+
+# Build outputs
+dist/
+build/
+target/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Coverage reports
 coverage/
 htmlcov/
 .coverage
 
-# Distribution / packaging
-*.tar.gz
-*.whl
-*.egg
-*.egg-info/
+# Database
+*.db
+*.sqlite
+*.sqlite3
 
 # OS generated files
 .DS_Store
