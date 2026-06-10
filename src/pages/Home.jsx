@@ -2,9 +2,12 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, Users, BookOpen, Building } from 'lucide-react';
+import { useApp } from '../context/AppContext';
 import Button from '../components/common/Button';
 
 const Home = () => {
+  const { beritaList } = useApp();
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
@@ -124,7 +127,7 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Berita Terbaru */}
+      {/* Berita Terbaru - Dynamic from Context */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div 
@@ -137,9 +140,11 @@ const Home = () => {
               <h2 className="text-3xl font-bold text-gray-900 mb-4">Berita & Artikel</h2>
               <div className="w-24 h-1 bg-pesantren-green rounded"></div>
             </div>
-            <Button variant="outline" className="hidden sm:inline-flex">
-              Lihat Semua
-            </Button>
+            <Link to="/galeri">
+              <Button variant="outline" className="hidden sm:inline-flex">
+                Lihat Semua
+              </Button>
+            </Link>
           </motion.div>
 
           <motion.div 
@@ -149,119 +154,41 @@ const Home = () => {
             transition={{ delay: 0.2 }}
             className="grid md:grid-cols-2 lg:grid-cols-4 gap-6"
           >
-            {/* Berita 1 - Wisuda */}
-            <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group flex flex-col">
-              <div className="h-48 overflow-hidden bg-gray-200 shrink-0">
-                <img 
-                  src="/wisuda.png" 
-                  alt="Wisuda Santri KMI Angkatan ke-7" 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  onError={(e) => {
-                    e.target.onerror = null; 
-                    e.target.src = "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&q=80&w=600";
-                  }}
-                />
+            {beritaList.slice(0, 4).map((berita) => (
+              <div key={berita.id} className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group flex flex-col">
+                <div className="h-48 overflow-hidden bg-gray-200 shrink-0">
+                  <img 
+                    src={berita.image || '/wisuda.png'} 
+                    alt={berita.title} 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    onError={(e) => {
+                      e.target.onerror = null; 
+                      e.target.src = "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&q=80&w=600";
+                    }}
+                  />
+                </div>
+                <div className="p-6 flex flex-col grow">
+                  <div className="text-sm text-pesantren-red font-semibold mb-2">{berita.category}</div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-3 hover:text-pesantren-green cursor-pointer transition-colors leading-snug">
+                    {berita.title}
+                  </h3>
+                  <p className="text-gray-600 mb-4 line-clamp-3 grow">
+                    {berita.excerpt}
+                  </p>
+                  <Link to={`/berita/${berita.id}`} className="inline-flex items-center text-pesantren-green font-medium hover:text-pesantren-darkGreen mt-auto">
+                    Baca selengkapnya <ArrowRight size={16} className="ml-1" />
+                  </Link>
+                </div>
               </div>
-              <div className="p-6 flex flex-col grow">
-                <div className="text-sm text-pesantren-red font-semibold mb-2">Kegiatan Pesantren</div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3 hover:text-pesantren-green cursor-pointer transition-colors leading-snug">
-                  Wisuda Santri KMI Angkatan ke-7 — Ferventera Generation
-                </h3>
-                <p className="text-gray-600 mb-4 line-clamp-3 grow">
-                  Alhamdulillah, dengan penuh rasa syukur dan haru, kami mengabadikan momen bersejarah Wisuda Santri Kelas Akhir KMI Angkatan ke-7 Ferventera Generation Pondok Modern Al-Hikmah Pemenang.
-                </p>
-                <Link to="/berita/wisuda-kmi" className="inline-flex items-center text-pesantren-green font-medium hover:text-pesantren-darkGreen mt-auto">
-                  Baca selengkapnya <ArrowRight size={16} className="ml-1" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Berita 2 - Yudisium */}
-            <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group flex flex-col">
-              <div className="h-48 overflow-hidden bg-gray-200 shrink-0">
-                <img 
-                  src="/yudisium.png" 
-                  alt="Yudisium Santri KMI" 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  onError={(e) => {
-                    e.target.onerror = null; 
-                    e.target.src = "https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&q=80&w=600";
-                  }}
-                />
-              </div>
-              <div className="p-6 flex flex-col grow">
-                <div className="text-sm text-pesantren-red font-semibold mb-2">Kegiatan Pesantren</div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3 hover:text-pesantren-green cursor-pointer transition-colors leading-snug">
-                  Yudisium dan Pengarahan Pengabdian Santri KMI Angkatan ke-7
-                </h3>
-                <p className="text-gray-600 mb-4 line-clamp-3 grow">
-                  Kegiatan ini menjadi penanda berakhirnya masa pendidikan formal para santri, sekaligus awal dari pengabdian nyata di tengah masyarakat.
-                </p>
-                <Link to="/berita/yudisium-kmi" className="inline-flex items-center text-pesantren-green font-medium hover:text-pesantren-darkGreen mt-auto">
-                  Baca selengkapnya <ArrowRight size={16} className="ml-1" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Berita 3 - Halal Bihalal */}
-            <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group flex flex-col">
-              <div className="h-48 overflow-hidden bg-gray-200 shrink-0">
-                <img 
-                  src="/bihalal.png" 
-                  alt="Halal Bihalal Pondok Pesantren" 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  onError={(e) => {
-                    e.target.onerror = null; 
-                    e.target.src = "https://images.unsplash.com/photo-1601058268574-0610360a0b27?auto=format&fit=crop&q=80&w=600";
-                  }}
-                />
-              </div>
-              <div className="p-6 flex flex-col grow">
-                <div className="text-sm text-pesantren-red font-semibold mb-2">Acara & Silaturahmi</div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3 hover:text-pesantren-green cursor-pointer transition-colors leading-snug">
-                  Halal Bihalal Keluarga Besar Pondok Modern Al-Hikmah
-                </h3>
-                <p className="text-gray-600 mb-4 line-clamp-3 grow">
-                  Momen penuh makna untuk menautkan kembali hati, menguatkan ukhuwah, serta memperbarui niat dalam kebersamaan di jalan kebaikan.
-                </p>
-                <Link to="/berita/halal-bihalal" className="inline-flex items-center text-pesantren-green font-medium hover:text-pesantren-darkGreen mt-auto">
-                  Baca selengkapnya <ArrowRight size={16} className="ml-1" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Berita 4 - Donasi Ramadhan */}
-            <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group flex flex-col">
-              <div className="h-48 overflow-hidden bg-gray-200 shrink-0">
-                <img 
-                  src="/donasi.png" 
-                  alt="Program Ramadhan Berbagi" 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  onError={(e) => {
-                    e.target.onerror = null; 
-                    e.target.src = "https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?auto=format&fit=crop&q=80&w=600";
-                  }}
-                />
-              </div>
-              <div className="p-6 flex flex-col grow">
-                <div className="text-sm text-pesantren-red font-semibold mb-2">Sosial & Kemanusiaan</div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3 hover:text-pesantren-green cursor-pointer transition-colors leading-snug">
-                  Penyaluran Donasi Program Ramadhan Berbagi
-                </h3>
-                <p className="text-gray-600 mb-4 line-clamp-3 grow">
-                  Alhamdulillah, donasi yang terkumpul dalam program ini mencapai Rp 14.649.000 dan telah disalurkan untuk lansia dan dhuafa.
-                </p>
-                <Link to="/berita/donasi-ramadhan" className="inline-flex items-center text-pesantren-green font-medium hover:text-pesantren-darkGreen mt-auto">
-                  Baca selengkapnya <ArrowRight size={16} className="ml-1" />
-                </Link>
-              </div>
-            </div>
+            ))}
           </motion.div>
           
           <div className="mt-10 text-center sm:hidden">
-            <Button variant="outline" className="w-full">
-              Lihat Semua Berita
-            </Button>
+            <Link to="/galeri">
+              <Button variant="outline" className="w-full">
+                Lihat Semua Berita
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
