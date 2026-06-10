@@ -1,98 +1,244 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Music, Upload, Save, X, LogOut } from 'lucide-react';
+import { Music, Upload, Save, X, LogOut, Loader } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const AdminDashboard = () => {
-  const { currentMusic, updateMusic, beritaList, addBerita, deleteBerita, galeriList, addGaleri, deleteGaleri } = useApp();
+  const { currentMusic, updateMusic, refreshData } = useApp();
   const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState('musik');
-  const [musicName, setMusicName] = useState(currentMusic.name);
+  const [musicName, setMusicName] = useState('');
   const musicFileRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [token, setToken] = useState(null);
   
+  // State untuk berita dari database
+  const [beritaList, setBeritaList] = useState([]);
+  const [loadingBerita, setLoadingBerita] = useState(true);
+  
+  // State untuk galeri dari database
+  const [galeriList, setGaleriList] = useState([]);
+  const [loadingGaleri, setLoadingGaleri] = useState(true);
+
   // Form state untuk berita
   const [beritaForm, setBeritaForm] = useState({
     title: '',
-    category: 'Kegiatan Pesantren',
-    image: '',
-    excerpt: '',
-    content: ''
+    content: '',
+    published: true
   });
+  const [beritaImage, setBeritaImage] = useState(null);
 
   // Form state untuk galeri
   const [galeriForm, setGaleriForm] = useState({
     title: '',
-    image: ''
+    caption: ''
   });
+  const [galeriImage, setGaleriImage] = useState(null);
 
-  const handleLogout = () => {
-    localStorage.removeItem('isAdminLoggedIn');
-    navigate('/');
+  // Load token dan data saat mount
+  useEffect(() => {
+    const savedToken = localStorage.getItem('adminToken');
+    if (savedToken) {
+      setToken(savedToken);
+      fetchBerita();
+      fetchGaleri();
+      if (currentMusic) {
+        setMusicName(currentMusic.name);
+      }
+    } else {
+      navigate('/admin/login');
+    }
+  }, []);
+
+  const fetchBerita = async () => {
+    try {
+      setLoadingBerita(true);
+      const res = await axios.get(`${API_URL}/news/all`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data.success) {
+        setBeritaList(res.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching berita:', error);
+    } finally {
+      setLoadingBerita(false);
+    }
   };
 
-  const handleMusicUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      updateMusic({
-        name: musicName || file.name,
-        url: url
+  const fetchGaleri = async () => {
+    try {
+      setLoadingGaleri(true);
+      const res = await axios.get(`${API_URL}/gallery`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      alert('Musik berhasil diupdate!');
+      if (res.data.success) {
+        setGaleriList(res.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching galeri:', error);
+    } finally {
+      setLoadingGaleri(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('adminToken');
+    navigate('/admin/login');
+  };
+
+  const handleMusicUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('musicFile', file);
+    formData.append('name', musicName || file.name);
+
+    try {
+      const res = await axios.post(`${API_URL}/music`, formData, {
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (res.data.success) {
+        updateMusic({
+          name: res.data.data.name,
+          url: `${API_URL}${res.data.data.fileUrl}`
+        });
+        alert('Musik berhasil diupload!');
+        refreshData();
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Gagal upload musik: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setUploading(false);
+      if (musicFileRef.current) {
+        musicFileRef.current.value = '';
+      }
     }
   };
 
   const handleSaveMusic = () => {
     updateMusic({
       name: musicName,
-      url: currentMusic.url
+      url: currentMusic?.url
     });
     alert('Nama musik berhasil disimpan!');
   };
 
-  const handleAddBerita = (e) => {
+  const handleAddBerita = async (e) => {
     e.preventDefault();
-    if (!beritaForm.title || !beritaForm.excerpt) {
-      alert('Judul dan ringkasan harus diisi!');
+    if (!beritaForm.title || !beritaForm.content) {
+      alert('Judul dan konten harus diisi!');
       return;
     }
-    addBerita(beritaForm);
-    setBeritaForm({
-      title: '',
-      category: 'Kegiatan Pesantren',
-      image: '',
-      excerpt: '',
-      content: ''
-    });
-    alert('Berita berhasil ditambahkan!');
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('title', beritaForm.title);
+    formData.append('content', beritaForm.content);
+    formData.append('published', beritaForm.published);
+    if (beritaImage) {
+      formData.append('image', beritaImage);
+    }
+
+    try {
+      const res = await axios.post(`${API_URL}/news`, formData, {
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (res.data.success) {
+        setBeritaForm({ title: '', content: '', published: true });
+        setBeritaImage(null);
+        await fetchBerita();
+        await refreshData();
+        alert('Berita berhasil ditambahkan!');
+      }
+    } catch (error) {
+      console.error('Create news error:', error);
+      alert('Gagal menambah berita: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const handleDeleteBerita = (id) => {
+  const handleDeleteBerita = async (id) => {
     if (confirm('Yakin ingin menghapus berita ini?')) {
-      deleteBerita(id);
-      alert('Berita berhasil dihapus!');
+      try {
+        await axios.delete(`${API_URL}/news/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        await fetchBerita();
+        await refreshData();
+        alert('Berita berhasil dihapus!');
+      } catch (error) {
+        console.error('Delete news error:', error);
+        alert('Gagal menghapus berita');
+      }
     }
   };
 
-  const handleAddGaleri = (e) => {
+  const handleAddGaleri = async (e) => {
     e.preventDefault();
-    if (!galeriForm.title || !galeriForm.image) {
-      alert('Judul dan URL gambar harus diisi!');
+    if (!galeriForm.title || !galeriImage) {
+      alert('Judul dan gambar harus diisi!');
       return;
     }
-    addGaleri(galeriForm);
-    setGaleriForm({
-      title: '',
-      image: ''
-    });
-    alert('Foto berhasil ditambahkan!');
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('title', galeriForm.title);
+    formData.append('caption', galeriForm.caption || '');
+    formData.append('image', galeriImage);
+
+    try {
+      const res = await axios.post(`${API_URL}/gallery`, formData, {
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (res.data.success) {
+        setGaleriForm({ title: '', caption: '' });
+        setGaleriImage(null);
+        await fetchGaleri();
+        await refreshData();
+        alert('Foto berhasil ditambahkan!');
+      }
+    } catch (error) {
+      console.error('Upload gallery error:', error);
+      alert('Gagal menambah foto: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const handleDeleteGaleri = (id) => {
+  const handleDeleteGaleri = async (id) => {
     if (confirm('Yakin ingin menghapus foto ini?')) {
-      deleteGaleri(id);
-      alert('Foto berhasil dihapus!');
+      try {
+        await axios.delete(`${API_URL}/gallery/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        await fetchGaleri();
+        await refreshData();
+        alert('Foto berhasil dihapus!');
+      } catch (error) {
+        console.error('Delete gallery error:', error);
+        alert('Gagal menghapus foto');
+      }
     }
   };
 
@@ -218,37 +364,12 @@ const AdminDashboard = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
-                  <select
-                    value={beritaForm.category}
-                    onChange={(e) => setBeritaForm({...beritaForm, category: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pesantren-green outline-none"
-                  >
-                    <option>Kegiatan Pesantren</option>
-                    <option>Acara & Silaturahmi</option>
-                    <option>Sosial & Kemanusiaan</option>
-                    <option>Prestasi Santri</option>
-                    <option>Lainnya</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">URL Gambar</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Gambar (Opsional)</label>
                   <input
-                    type="text"
-                    value={beritaForm.image}
-                    onChange={(e) => setBeritaForm({...beritaForm, image: e.target.value})}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setBeritaImage(e.target.files[0])}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pesantren-green outline-none"
-                    placeholder="/wisuda.png atau https://..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ringkasan</label>
-                  <textarea
-                    value={beritaForm.excerpt}
-                    onChange={(e) => setBeritaForm({...beritaForm, excerpt: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pesantren-green outline-none"
-                    rows="3"
-                    required
                   />
                 </div>
                 <div>
@@ -257,14 +378,27 @@ const AdminDashboard = () => {
                     value={beritaForm.content}
                     onChange={(e) => setBeritaForm({...beritaForm, content: e.target.value})}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pesantren-green outline-none"
-                    rows="5"
+                    rows="8"
+                    required
                   />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="published"
+                    checked={beritaForm.published}
+                    onChange={(e) => setBeritaForm({...beritaForm, published: e.target.checked})}
+                    className="w-4 h-4 text-pesantren-green focus:ring-pesantren-green"
+                  />
+                  <label htmlFor="published" className="text-sm font-medium text-gray-700">Publikasikan Sekarang</label>
                 </div>
                 <button
                   type="submit"
-                  className="w-full bg-pesantren-green text-white py-2 rounded-lg font-semibold hover:bg-pesantren-darkGreen transition-colors"
+                  disabled={uploading}
+                  className="w-full bg-pesantren-green text-white py-2 rounded-lg font-semibold hover:bg-pesantren-darkGreen transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  Tambah Berita
+                  {uploading && <Loader size={18} className="animate-spin" />}
+                  {uploading ? 'Mengupload...' : 'Tambah Berita'}
                 </button>
               </form>
             </div>
@@ -272,26 +406,32 @@ const AdminDashboard = () => {
             {/* Daftar Berita */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Daftar Berita ({beritaList.length})</h2>
-              <div className="space-y-4 max-h-[600px] overflow-y-auto">
-                {beritaList.map(berita => (
-                  <div key={berita.id} className="border border-gray-200 rounded-lg p-4 flex gap-4">
-                    {berita.image && (
-                      <img src={berita.image} alt={berita.title} className="w-20 h-20 object-cover rounded-lg bg-gray-100" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 truncate">{berita.title}</h3>
-                      <p className="text-sm text-gray-500">{berita.date} • {berita.category}</p>
-                      <p className="text-sm text-gray-600 mt-1 line-clamp-2">{berita.excerpt}</p>
+              {loadingBerita ? (
+                <div className="flex justify-center items-center py-12">
+                  <Loader size={32} className="animate-spin text-pesantren-green" />
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[600px] overflow-y-auto">
+                  {beritaList.map(berita => (
+                    <div key={berita._id} className="border border-gray-200 rounded-lg p-4 flex gap-4">
+                      {berita.imageUrl && (
+                        <img src={`${API_URL}${berita.imageUrl}`} alt={berita.title} className="w-20 h-20 object-cover rounded-lg bg-gray-100" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 truncate">{berita.title}</h3>
+                        <p className="text-sm text-gray-500">{new Date(berita.createdAt).toLocaleDateString('id-ID')}</p>
+                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">{berita.content.substring(0, 100)}...</p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteBerita(berita._id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg self-start"
+                      >
+                        <X size={18} />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleDeleteBerita(berita.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg self-start"
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -314,21 +454,32 @@ const AdminDashboard = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">URL Gambar</label>
-                  <input
-                    type="text"
-                    value={galeriForm.image}
-                    onChange={(e) => setGaleriForm({...galeriForm, image: e.target.value})}
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Caption (Opsional)</label>
+                  <textarea
+                    value={galeriForm.caption}
+                    onChange={(e) => setGaleriForm({...galeriForm, caption: e.target.value})}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pesantren-green outline-none"
-                    placeholder="/wisuda.png atau https://..."
+                    rows="2"
+                    placeholder="Deskripsi foto..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Upload Gambar</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setGaleriImage(e.target.files[0])}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pesantren-green outline-none"
                     required
                   />
                 </div>
                 <button
                   type="submit"
-                  className="w-full bg-pesantren-green text-white py-2 rounded-lg font-semibold hover:bg-pesantren-darkGreen transition-colors"
+                  disabled={uploading}
+                  className="w-full bg-pesantren-green text-white py-2 rounded-lg font-semibold hover:bg-pesantren-darkGreen transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  Tambah Foto
+                  {uploading && <Loader size={18} className="animate-spin" />}
+                  {uploading ? 'Mengupload...' : 'Tambah Foto'}
                 </button>
               </form>
             </div>
@@ -336,21 +487,28 @@ const AdminDashboard = () => {
             {/* Daftar Galeri */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Daftar Galeri ({galeriList.length})</h2>
-              <div className="grid grid-cols-2 gap-4 max-h-[600px] overflow-y-auto">
-                {galeriList.map(foto => (
-                  <div key={foto.id} className="relative group">
-                    <img src={foto.image} alt={foto.title} className="w-full h-32 object-cover rounded-lg bg-gray-100" />
-                    <p className="text-sm font-medium text-gray-700 mt-1 truncate">{foto.title}</p>
-                    <p className="text-xs text-gray-500">{foto.date}</p>
-                    <button
-                      onClick={() => handleDeleteGaleri(foto.id)}
-                      className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
+              {loadingGaleri ? (
+                <div className="flex justify-center items-center py-12">
+                  <Loader size={32} className="animate-spin text-pesantren-green" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4 max-h-[600px] overflow-y-auto">
+                  {galeriList.map(foto => (
+                    <div key={foto._id} className="relative group">
+                      <img src={`${API_URL}${foto.imageUrl}`} alt={foto.title} className="w-full h-32 object-cover rounded-lg bg-gray-100" />
+                      <p className="text-sm font-medium text-gray-700 mt-1 truncate">{foto.title}</p>
+                      {foto.caption && <p className="text-xs text-gray-500 truncate">{foto.caption}</p>}
+                      <p className="text-xs text-gray-500">{new Date(foto.createdAt).toLocaleDateString('id-ID')}</p>
+                      <button
+                        onClick={() => handleDeleteGaleri(foto._id)}
+                        className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
